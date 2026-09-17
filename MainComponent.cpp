@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+
 // Window Design and Audio Setup
 MainComponent::MainComponent()
     : state(Stopped)
@@ -18,6 +19,86 @@ MainComponent::MainComponent()
 
     setSize(600, 300);
     setAudioChannels(0, 2);
+
+    //==========================================================================
+    // HEAVY METAL VOLUME CONTROL
+    //==========================================================================
+
+    volumeSlider.setRange(0.0, 100.0, 1.0);
+    volumeSlider.setValue(75.0);
+
+    volumeSlider.setSliderStyle(juce::Slider::LinearVertical);
+
+    volumeSlider.setTextBoxStyle(
+        juce::Slider::TextBoxBelow,
+        false,
+        70,
+        25
+    );
+
+    volumeSlider.setTextValueSuffix("%");
+
+    // Heavy metal colors
+    volumeSlider.setColour(
+        juce::Slider::backgroundColourId,
+        juce::Colours::black
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::trackColourId,
+        juce::Colours::darkgrey
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::thumbColourId,
+        juce::Colours::red
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::textBoxTextColourId,
+        juce::Colours::white
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::textBoxBackgroundColourId,
+        juce::Colours::black
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::textBoxOutlineColourId,
+        juce::Colours::darkgrey
+    );
+
+    // Actually change the music volume
+    volumeSlider.onValueChange = [this]
+        {
+            transportSource.setGain(
+                static_cast<float>(volumeSlider.getValue() / 100.0)
+            );
+        };
+
+    addAndMakeVisible(volumeSlider);
+
+    // Volume label
+    volumeLabel.setText(
+        "VOLUME",
+        juce::dontSendNotification
+    );
+
+    volumeLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colours::white
+    );
+
+    volumeLabel.setFont(
+        juce::Font(18.0f, juce::Font::bold)
+    );
+
+    volumeLabel.setJustificationType(
+        juce::Justification::centred
+    );
+
+    addAndMakeVisible(volumeLabel);
 }
 
 MainComponent::~MainComponent()
@@ -55,6 +136,10 @@ void MainComponent::resized()
 {
     openButton.setBounds(10, 10, 80, 30);
     playButton.setBounds(100, 10, 80, 30);
+
+    // Heavy Metal Volume Control
+    volumeLabel.setBounds(450, 30, 100, 30);
+    volumeSlider.setBounds(460, 65, 80, 190);
 }
 
 void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
@@ -101,13 +186,19 @@ void MainComponent::changeState(TransportState newState)
 
 void MainComponent::openButtonClicked()
 {
-    chooser = std::make_unique<juce::FileChooser>("Select a WAV or MP3 file to play...",
+    chooser = std::make_unique<juce::FileChooser>(
+        "Select a WAV or MP3 file to play...",
         juce::File{},
-        "*.wav;*.mp3;*.flac;*.aiff");
+        "*.wav;*.mp3;*.flac;*.aiff"
+    );
 
-    auto folderChooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+    auto folderChooserFlags =
+        juce::FileBrowserComponent::openMode |
+        juce::FileBrowserComponent::canSelectFiles;
 
-    chooser->launchAsync(folderChooserFlags, [this](const juce::FileChooser& fc)
+    chooser->launchAsync(
+        folderChooserFlags,
+        [this](const juce::FileChooser& fc)
         {
             auto file = fc.getResult();
 
@@ -117,13 +208,25 @@ void MainComponent::openButtonClicked()
 
                 if (reader != nullptr)
                 {
-                    auto newSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
-                    transportSource.setSource(newSource.get(), 0, nullptr, reader->sampleRate);
+                    auto newSource =
+                        std::make_unique<juce::AudioFormatReaderSource>(
+                            reader,
+                            true
+                        );
+
+                    transportSource.setSource(
+                        newSource.get(),
+                        0,
+                        nullptr,
+                        reader->sampleRate
+                    );
+
                     playButton.setEnabled(true);
                     readerSource = std::move(newSource);
                 }
             }
-        });
+        }
+    );
 }
 
 void MainComponent::playButtonClicked()
