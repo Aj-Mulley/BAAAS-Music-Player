@@ -1,67 +1,150 @@
-#include <JuceHeader.h>
 #include "MainComponent.h"
-
-class NewProjectApplication : public juce::JUCEApplication
+// Window Design and Audio Setup
+MainComponent::MainComponent()
+    : state(Stopped)
 {
-public:
-    NewProjectApplication() {}
+    openButton.setButtonText("Open...");
+    openButton.onClick = [this] { openButtonClicked(); };
+    addAndMakeVisible(openButton);
 
-    const juce::String getApplicationName() override { return "NewProject"; }
-    const juce::String getApplicationVersion() override { return "1.0.0"; }
-    bool moreThanOneInstanceAllowed() override { return true; }
+    playButton.setButtonText("Play");
+    playButton.onClick = [this] { playButtonClicked(); };
+    playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
+    playButton.setEnabled(false);
+    addAndMakeVisible(playButton);
 
-    void initialise(const juce::String& commandLine) override
+    formatManager.registerBasicFormats();
+    transportSource.addChangeListener(this);
+
+    setSize(600, 300);
+    setAudioChannels(0, 2);
+}
+
+MainComponent::~MainComponent()
+{
+    shutdownAudio();
+}
+
+void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
+{
+    transportSource.prepareToPlay(samplesPerBlockExpected, sampleRate);
+}
+
+void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
+{
+    if (transportSource.getTotalLength() <= 0)
     {
-        mainWindow.reset(new MainWindow(getApplicationName()));
+        bufferToFill.clearActiveBufferRegion();
+        return;
     }
 
-    void shutdown() override
-    {
-        mainWindow = nullptr;
-    }
+    transportSource.getNextAudioBlock(bufferToFill);
+}
 
-    void systemRequestedQuit() override
-    {
-        quit();
-    }
+void MainComponent::releaseResources()
+{
+    transportSource.releaseResources();
+}
 
-    void anotherInstanceStarted(const juce::String& commandLine) override
-    {
-    }
+void MainComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+}
 
-    class MainWindow : public juce::DocumentWindow
+void MainComponent::resized()
+{
+    openButton.setBounds(10, 10, 80, 30);
+    playButton.setBounds(100, 10, 80, 30);
+}
+
+void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    if (source == &transportSource)
     {
-    public:
-        MainWindow(juce::String name)
-            : DocumentWindow(name,
-                juce::Desktop::getInstance().getDefaultLookAndFeel()
-                .findColour(juce::ResizableWindow::backgroundColourId),
-                DocumentWindow::allButtons)
+        if (transportSource.isPlaying())
+            changeState(Playing);
+        else
+            changeState(Stopped);
+    }
+}
+
+void MainComponent::changeState(TransportState newState)
+{
+    if (state != newState)
+    {
+        state = newState;
+
+        switch (state)
         {
-            setUsingNativeTitleBar(true);
-            setContentOwned(new MainComponent(), true);
+        case Stopped:
+            playButton.setButtonText("Play");
+            playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
+            transportSource.setPosition(0.0);
+            break;
 
-#if JUCE_IOS || JUCE_ANDROID
-            setFullScreen(true);
-#else
-            setResizable(true, true);
-            centreWithSize(600, 400);
-#endif
+        case Starting:
+            playButton.setEnabled(true);
+            transportSource.start();
+            break;
 
-            setVisible(true);
+        case Playing:
+            playButton.setButtonText("Stop");
+            playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::red);
+            break;
+
+        case Stopping:
+            transportSource.stop();
+            break;
         }
+    }
+}
 
-        void closeButtonPressed() override
+void MainComponent::openButtonClicked()
+{
+    auto libraryDirectory = juce::File(__FILE__) //Finds the library internally
+                                .getParentDirectory()
+                                .getChildFile("Library");
+
+    chooser = std::make_unique<juce::FileChooser>(//File explorer music select needs to be deprecated with GUI
+        "Select a WAV or MP3 file to play...",
+        libraryDirectory,
+        "*.wav;*.mp3;*.flac;*.aiff");
+
+    auto fileChooserFlags = juce::FileBrowserComponent::openMode
+                          | juce::FileBrowserComponent::canSelectFiles;
+
+    chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
+    {
+        auto file = fc.getResult();
+
+        if (file != juce::File{})//Play features likely to change with play/pause
         {
-            JUCEApplication::getInstance()->systemRequestedQuit();
+            auto* reader = formatManager.createReaderFor(file);
+
+            if (reader != nullptr)
+            {
+                auto newSource = std::make_unique<juce::AudioFormatReaderSource>(
+                    reader, true);
+
+                transportSource.setSource(
+                    newSource.get(),
+                    0,
+                    nullptr,
+                    reader->sampleRate);
+
+                playButton.setEnabled(true);
+                readerSource = std::move(newSource);
+            }
         }
+    });
+}
 
-    private:
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
-    };
 
-private:
-    std::unique_ptr<MainWindow> mainWindow;
-};
 
-START_JUCE_APPLICATION(NewProjectApplication)
+void MainComponent::playButtonClicked()
+{
+    if (state == Stopped)
+        changeState(Starting);
+    else if (state == Playing)
+        changeState(Stopping);
+}
