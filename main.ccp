@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include <JuceHeader.h>
 // Window Design and Audio Setup
 MainComponent::MainComponent()
     : state(Stopped)
@@ -111,7 +112,7 @@ void MainComponent::openButtonClicked()
         "*.wav;*.mp3;*.flac;*.aiff");
 
     auto fileChooserFlags = juce::FileBrowserComponent::openMode
-                          | juce::FileBrowserComponent::canSelectFiles;
+                          | juce::FileBrowserComponent::canSelectFiles; //file selector
 
     chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
     {
