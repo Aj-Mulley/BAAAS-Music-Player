@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+//Functions Declarations
 class MainComponent : public juce::AudioAppComponent,
     public juce::ChangeListener
 {

@@ -32,28 +32,77 @@ MainComponent::MainComponent()
 
     volumeSlider.setRange(0.0, 100.0, 1.0);
     volumeSlider.setValue(75.0);
+
     volumeSlider.setSliderStyle(juce::Slider::LinearVertical);
-    volumeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 25);
+
+    volumeSlider.setTextBoxStyle(
+        juce::Slider::TextBoxBelow,
+        false,
+        70,
+        25
+    );
+
     volumeSlider.setTextValueSuffix("%");
 
-    volumeSlider.setColour(juce::Slider::backgroundColourId, juce::Colours::black);
-    volumeSlider.setColour(juce::Slider::trackColourId, juce::Colours::darkgrey);
-    volumeSlider.setColour(juce::Slider::thumbColourId, juce::Colours::red);
-    volumeSlider.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
-    volumeSlider.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::black);
-    volumeSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::darkgrey);
+    // Heavy metal colors
+    volumeSlider.setColour(
+        juce::Slider::backgroundColourId,
+        juce::Colours::black
+    );
 
+    volumeSlider.setColour(
+        juce::Slider::trackColourId,
+        juce::Colours::darkgrey
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::thumbColourId,
+        juce::Colours::red
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::textBoxTextColourId,
+        juce::Colours::white
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::textBoxBackgroundColourId,
+        juce::Colours::black
+    );
+
+    volumeSlider.setColour(
+        juce::Slider::textBoxOutlineColourId,
+        juce::Colours::darkgrey
+    );
+
+    // Actually change the music volume
     volumeSlider.onValueChange = [this]
         {
-            transportSource.setGain(static_cast<float>(volumeSlider.getValue() / 100.0));
+            transportSource.setGain(
+                static_cast<float>(volumeSlider.getValue() / 100.0)
+            );
         };
 
     addAndMakeVisible(volumeSlider);
 
-    volumeLabel.setText("VOLUME", juce::dontSendNotification);
-    volumeLabel.setColour(juce::Label::textColourId, juce::Colours::white);
-    volumeLabel.setFont(juce::Font(18.0f, juce::Font::bold));
-    volumeLabel.setJustificationType(juce::Justification::centred);
+    // Volume label
+    volumeLabel.setText(
+        "VOLUME",
+        juce::dontSendNotification
+    );
+
+    volumeLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colours::white
+    );
+
+    volumeLabel.setFont(
+        juce::Font(18.0f, juce::Font::bold)
+    );
+
+    volumeLabel.setJustificationType(
+        juce::Justification::centred
+    );
 
     addAndMakeVisible(volumeLabel);
 }
@@ -95,6 +144,7 @@ void MainComponent::resized()
     playButton.setBounds(100, 10, 80, 30);
     libraryBox.setBounds(10, 50, 300, 30);
 
+    // Heavy Metal Volume Control
     volumeLabel.setBounds(450, 30, 100, 30);
     volumeSlider.setBounds(460, 65, 80, 190);
 }
@@ -161,7 +211,7 @@ void MainComponent::refreshLibraryList()
     auto libraryDir = getLibraryDirectory();
     auto files = libraryDir.findChildFiles(juce::File::findFiles, false);
 
-    int itemId = 1;
+    int itemId = 1; // ComboBox IDs must start at 1
 
     for (auto& f : files)
     {
@@ -187,8 +237,19 @@ void MainComponent::trackSelected()
         {
             changeState(Stopped);
 
-            auto newSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
-            transportSource.setSource(newSource.get(), 0, nullptr, reader->sampleRate);
+            auto newSource =
+                std::make_unique<juce::AudioFormatReaderSource>(
+                    reader,
+                    true
+                );
+
+            transportSource.setSource(
+                newSource.get(),
+                0,
+                nullptr,
+                reader->sampleRate
+            );
+
             playButton.setEnabled(true);
             readerSource = std::move(newSource);
         }
@@ -221,7 +282,7 @@ void MainComponent::openButtonClicked()
         {
             auto file = fc.getResult();
 
-            if (file != juce::File{})
+            if (file != juce::File{}) //copies file to library folder
             {
                 auto libraryDir = getLibraryDirectory();
                 auto destFile = libraryDir.getNonexistentChildFile(
