@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-// Functions Declarations
 class MainComponent : public juce::AudioAppComponent,
     public juce::ChangeListener
 {
@@ -30,9 +29,13 @@ private:
     void changeState(TransportState newState);
     void openButtonClicked();
     void playButtonClicked();
+    juce::File getLibraryDirectory();
+    void refreshLibraryList();
+    void trackSelected();
 
     juce::TextButton openButton;
     juce::TextButton playButton;
+    juce::ComboBox libraryBox;
 
     // Heavy Metal Volume Control
     juce::Slider volumeSlider;
@@ -44,6 +47,8 @@ private:
     TransportState state;
 
     std::unique_ptr<juce::FileChooser> chooser;
+
+    std::vector<juce::File> libraryFiles; //maps combobox item IDs to files
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

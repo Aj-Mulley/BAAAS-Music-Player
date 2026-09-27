@@ -14,11 +14,17 @@ MainComponent::MainComponent()
     playButton.setEnabled(false);
     addAndMakeVisible(playButton);
 
+    libraryBox.setTextWhenNothingSelected("Library (empty)");
+    libraryBox.onChange = [this] { trackSelected(); };
+    addAndMakeVisible(libraryBox);
+
     formatManager.registerBasicFormats();
     transportSource.addChangeListener(this);
 
     setSize(600, 300);
     setAudioChannels(0, 2);
+
+    refreshLibraryList();
 
     //==========================================================================
     // HEAVY METAL VOLUME CONTROL
@@ -26,77 +32,28 @@ MainComponent::MainComponent()
 
     volumeSlider.setRange(0.0, 100.0, 1.0);
     volumeSlider.setValue(75.0);
-
     volumeSlider.setSliderStyle(juce::Slider::LinearVertical);
-
-    volumeSlider.setTextBoxStyle(
-        juce::Slider::TextBoxBelow,
-        false,
-        70,
-        25
-    );
-
+    volumeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 25);
     volumeSlider.setTextValueSuffix("%");
 
-    // Heavy metal colors
-    volumeSlider.setColour(
-        juce::Slider::backgroundColourId,
-        juce::Colours::black
-    );
+    volumeSlider.setColour(juce::Slider::backgroundColourId, juce::Colours::black);
+    volumeSlider.setColour(juce::Slider::trackColourId, juce::Colours::darkgrey);
+    volumeSlider.setColour(juce::Slider::thumbColourId, juce::Colours::red);
+    volumeSlider.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
+    volumeSlider.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::black);
+    volumeSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::darkgrey);
 
-    volumeSlider.setColour(
-        juce::Slider::trackColourId,
-        juce::Colours::darkgrey
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::thumbColourId,
-        juce::Colours::red
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::textBoxTextColourId,
-        juce::Colours::white
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::textBoxBackgroundColourId,
-        juce::Colours::black
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::textBoxOutlineColourId,
-        juce::Colours::darkgrey
-    );
-
-    // Actually change the music volume
     volumeSlider.onValueChange = [this]
         {
-            transportSource.setGain(
-                static_cast<float>(volumeSlider.getValue() / 100.0)
-            );
+            transportSource.setGain(static_cast<float>(volumeSlider.getValue() / 100.0));
         };
 
     addAndMakeVisible(volumeSlider);
 
-    // Volume label
-    volumeLabel.setText(
-        "VOLUME",
-        juce::dontSendNotification
-    );
-
-    volumeLabel.setColour(
-        juce::Label::textColourId,
-        juce::Colours::white
-    );
-
-    volumeLabel.setFont(
-        juce::Font(18.0f, juce::Font::bold)
-    );
-
-    volumeLabel.setJustificationType(
-        juce::Justification::centred
-    );
+    volumeLabel.setText("VOLUME", juce::dontSendNotification);
+    volumeLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    volumeLabel.setFont(juce::Font(18.0f, juce::Font::bold));
+    volumeLabel.setJustificationType(juce::Justification::centred);
 
     addAndMakeVisible(volumeLabel);
 }
@@ -136,8 +93,8 @@ void MainComponent::resized()
 {
     openButton.setBounds(10, 10, 80, 30);
     playButton.setBounds(100, 10, 80, 30);
+    libraryBox.setBounds(10, 50, 300, 30);
 
-    // Heavy Metal Volume Control
     volumeLabel.setBounds(450, 30, 100, 30);
     volumeSlider.setBounds(460, 65, 80, 190);
 }
@@ -184,6 +141,68 @@ void MainComponent::changeState(TransportState newState)
     }
 }
 
+juce::File MainComponent::getLibraryDirectory()
+{
+    auto libraryDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+        .getParentDirectory()
+        .getChildFile("library");
+
+    if (!libraryDir.exists())
+        libraryDir.createDirectory();
+
+    return libraryDir;
+}
+
+void MainComponent::refreshLibraryList()
+{
+    libraryFiles.clear();
+    libraryBox.clear(juce::dontSendNotification);
+
+    auto libraryDir = getLibraryDirectory();
+    auto files = libraryDir.findChildFiles(juce::File::findFiles, false);
+
+    int itemId = 1;
+
+    for (auto& f : files)
+    {
+        if (f.getFileName() == ".gitkeep")
+            continue;
+
+        libraryFiles.push_back(f);
+        libraryBox.addItem(f.getFileName(), itemId);
+        ++itemId;
+    }
+}
+
+void MainComponent::trackSelected()
+{
+    auto index = libraryBox.getSelectedId() - 1;
+
+    if (index >= 0 && index < (int)libraryFiles.size())
+    {
+        auto& file = libraryFiles[(size_t)index];
+        auto* reader = formatManager.createReaderFor(file);
+
+        if (reader != nullptr)
+        {
+            changeState(Stopped);
+
+            auto newSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
+            transportSource.setSource(newSource.get(), 0, nullptr, reader->sampleRate);
+            playButton.setEnabled(true);
+            readerSource = std::move(newSource);
+        }
+        else
+        {
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::MessageBoxIconType::WarningIcon,
+                "Playback failed",
+                "That library file couldn't be read as audio."
+            );
+        }
+    }
+}
+
 void MainComponent::openButtonClicked()
 {
     chooser = std::make_unique<juce::FileChooser>(
@@ -204,25 +223,51 @@ void MainComponent::openButtonClicked()
 
             if (file != juce::File{})
             {
-                auto* reader = formatManager.createReaderFor(file);
+                auto libraryDir = getLibraryDirectory();
+                auto destFile = libraryDir.getNonexistentChildFile(
+                    file.getFileNameWithoutExtension(),
+                    file.getFileExtension());
 
-                if (reader != nullptr)
+                if (file.copyFileTo(destFile))
                 {
-                    auto newSource =
-                        std::make_unique<juce::AudioFormatReaderSource>(
-                            reader,
-                            true
+                    refreshLibraryList();
+
+                    auto* reader = formatManager.createReaderFor(destFile);
+
+                    if (reader != nullptr)
+                    {
+                        auto newSource =
+                            std::make_unique<juce::AudioFormatReaderSource>(
+                                reader,
+                                true
+                            );
+
+                        transportSource.setSource(
+                            newSource.get(),
+                            0,
+                            nullptr,
+                            reader->sampleRate
                         );
 
-                    transportSource.setSource(
-                        newSource.get(),
-                        0,
-                        nullptr,
-                        reader->sampleRate
+                        playButton.setEnabled(true);
+                        readerSource = std::move(newSource);
+                    }
+                    else
+                    {
+                        juce::AlertWindow::showMessageBoxAsync(
+                            juce::MessageBoxIconType::WarningIcon,
+                            "Playback failed",
+                            "The file was copied to your library, but couldn't be read as audio."
+                        );
+                    }
+                }
+                else
+                {
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::MessageBoxIconType::WarningIcon,
+                        "Import failed",
+                        "Couldn't copy that file into your library."
                     );
-
-                    playButton.setEnabled(true);
-                    readerSource = std::move(newSource);
                 }
             }
         }

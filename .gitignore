@@ -1,0 +1,23 @@
+# Build artifacts
+Builds/
+Build/
+*.exe
+*.pdb
+*.ilk
+*.obj
+*.exp
+*.lib
+
+# Projucer-generated code
+JuceLibraryCode/
+
+# VS junk
+.vs/
+*.suo
+*.user
+*.sdf
+*.VC.db
+
+# Runtime library folder (music files shouldn't be in git)
+library/
+!library/.gitkeep
