@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-// Functions Declarations 
+// Functions Declarations
 class MainComponent : public juce::AudioAppComponent,
     public juce::ChangeListener
 {
@@ -33,6 +33,10 @@ private:
 
     juce::TextButton openButton;
     juce::TextButton playButton;
+
+    // Heavy Metal Volume Control
+    juce::Slider volumeSlider;
+    juce::Label volumeLabel;
 
     juce::AudioFormatManager formatManager;
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
