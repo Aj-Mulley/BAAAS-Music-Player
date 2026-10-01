@@ -266,21 +266,25 @@ void MainComponent::trackSelected()
 
 void MainComponent::openButtonClicked()
 {
-    chooser = std::make_unique<juce::FileChooser>(
+    auto libraryDirectory = juce::File(__FILE__) //Finds the library internally
+                                .getParentDirectory()
+                                .getChildFile("Library");
+
+    chooser = std::make_unique<juce::FileChooser>(//File explorer music select needs to be deprecated with GUI
         "Select a WAV or MP3 file to play...",
-        juce::File{},
-        "*.wav;*.mp3;*.flac;*.aiff"
-    );
+        libraryDirectory,
+        "*.wav;*.mp3;*.flac;*.aiff");
 
-    auto folderChooserFlags =
-        juce::FileBrowserComponent::openMode |
-        juce::FileBrowserComponent::canSelectFiles;
+    auto fileChooserFlags = juce::FileBrowserComponent::openMode
+                          | juce::FileBrowserComponent::canSelectFiles; //file selector
 
-    chooser->launchAsync(
-        folderChooserFlags,
-        [this](const juce::FileChooser& fc)
+    chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
+    {
+        auto file = fc.getResult();
+
+        if (file != juce::File{})//Play features likely to change with play/pause
         {
-            auto file = fc.getResult();
+            auto* reader = formatManager.createReaderFor(file);
 
             if (file != juce::File{}) //copies file to library folder
             {
@@ -332,7 +336,7 @@ void MainComponent::openButtonClicked()
                 }
             }
         }
-    );
+    });
 }
 
 void MainComponent::playButtonClicked()
