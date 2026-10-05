@@ -145,8 +145,8 @@ void MainComponent::resized()
     libraryBox.setBounds(10, 50, 300, 30);
 
     // Heavy Metal Volume Control
-    volumeLabel.setBounds(getWidth() - 150, getHeight() - 270, 100, 30);
-    volumeSlider.setBounds(getWidth() - 140, getHeight() - 235, 80, 190);
+    volumeLabel.setBounds(450, 30, 100, 30);
+    volumeSlider.setBounds(460, 65, 80, 190);
 }
 
 void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
