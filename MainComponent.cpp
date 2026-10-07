@@ -113,6 +113,8 @@ MainComponent::~MainComponent()
 {
     transportSource.stop();
     transportSource.setSource(nullptr);
+    readerSource.reset();
+
     shutdownAudio();
 }
 
@@ -200,7 +202,6 @@ void MainComponent::changeState(TransportState newState)
             juce::TextButton::buttonColourId,
             juce::Colours::green
         );
-        transportSource.setPosition(0.0);
         break;
 
     case Starting:
@@ -209,7 +210,7 @@ void MainComponent::changeState(TransportState newState)
         break;
 
     case Playing:
-        playButton.setButtonText("Stop");
+        playButton.setButtonText("Pause");
         playButton.setColour(
             juce::TextButton::buttonColourId,
             juce::Colours::red
@@ -221,6 +222,7 @@ void MainComponent::changeState(TransportState newState)
         break;
     }
 }
+
 
 juce::File MainComponent::getLibraryDirectory()
 {
@@ -255,12 +257,67 @@ void MainComponent::refreshLibraryList()
         if (f.getFileName() == ".gitkeep")
             continue;
 
+
         libraryFiles.add(f);
         libraryBox.addItem(f.getFileName(), itemId);
 
         ++itemId;
     }
 }
+
+
+bool MainComponent::loadTrack(const juce::File& file)
+{
+    auto* reader = formatManager.createReaderFor(file);
+
+    if (reader == nullptr)
+        return false;
+
+    // Stop and remove the current track first
+    transportSource.stop();
+    transportSource.setSource(nullptr);
+    readerSource.reset();
+
+    // Create the new audio source
+    auto newSource =
+        std::make_unique<juce::AudioFormatReaderSource>(
+            reader,
+            true
+        );
+
+    // Connect the new source to the transport
+    transportSource.setSource(
+        newSource.get(),
+        0,
+        nullptr,
+        reader->sampleRate
+    );
+
+    // Store the source so it stays alive
+    readerSource = std::move(newSource);
+
+    // Restore current volume
+    transportSource.setGain(
+        static_cast<float>(
+            volumeSlider.getValue() / 100.0
+            )
+    );
+
+    // Reset playback state
+    transportSource.setPosition(0.0);
+    state = Stopped;
+
+    playButton.setButtonText("Play");
+    playButton.setColour(
+        juce::TextButton::buttonColourId,
+        juce::Colours::green
+    );
+    playButton.setEnabled(true);
+
+    return true;
+}
+
+
 
 void MainComponent::trackSelected()
 {
@@ -269,36 +326,7 @@ void MainComponent::trackSelected()
     if (index >= 0 &&
         index < static_cast<int>(libraryFiles.size()))
     {
-        auto& file = libraryFiles[
-            static_cast<size_t>(index)
-        ];
-
-        auto* reader = formatManager.createReaderFor(file);
-
-        if (reader != nullptr)
-        {
-            transportSource.stop();
-            transportSource.setSource(nullptr);
-
-            auto newSource =
-                std::make_unique<juce::AudioFormatReaderSource>(
-                    reader,
-                    true
-                );
-
-            transportSource.setSource(
-                newSource.get(),
-                0,
-                nullptr,
-                reader->sampleRate
-            );
-
-            readerSource = std::move(newSource);
-
-            playButton.setEnabled(true);
-            state = Stopped;
-        }
-        else
+        if (!loadTrack(libraryFiles[index]))
         {
             juce::AlertWindow::showMessageBoxAsync(
                 juce::MessageBoxIconType::WarningIcon,
@@ -309,80 +337,93 @@ void MainComponent::trackSelected()
     }
 }
 
+
 void MainComponent::openButtonClicked()
 {
-    auto libraryDirectory = juce::File(__FILE__) //Finds the library internally
-        .getParentDirectory()
-        .getChildFile("Library");
+    auto libraryDirectory = getLibraryDirectory();
 
-    chooser = std::make_unique<juce::FileChooser>(//File explorer music select needs to be deprecated with GUI
-        "Select a WAV or MP3 file to play...",
-        libraryDirectory,
-        "*.wav;*.mp3;*.flac;*.aiff");
+    // Allow the user to select any file
+    chooser = std::make_unique<juce::FileChooser>(
+        "Select an audio file...",
+        libraryDirectory
+    );
 
-    auto fileChooserFlags = juce::FileBrowserComponent::openMode
-        | juce::FileBrowserComponent::canSelectFiles; //file selector
+    auto fileChooserFlags =
+        juce::FileBrowserComponent::openMode
+        | juce::FileBrowserComponent::canSelectFiles;
 
-    chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
+    chooser->launchAsync(
+        fileChooserFlags,
+        [this](const juce::FileChooser& fc)
         {
             auto file = fc.getResult();
 
-            if (file != juce::File{})//Play features likely to change with play/pause
+            // User cancelled the file chooser
+            if (file == juce::File{})
+                return;
+
+            // Check the file extension
+            auto extension = file.getFileExtension().toLowerCase();
+
+   
+
+            // test whether JUCE can actually read the file
+            auto* testReader =
+                formatManager.createReaderFor(file);
+
+            if (testReader == nullptr)
             {
-                auto* reader = formatManager.createReaderFor(file);
+                juce::AlertWindow::showMessageBoxAsync(
+                    juce::MessageBoxIconType::WarningIcon,
+                    "Unsupported audio file",
+                    "JUCE could not read this file as audio.\n\n"
+                    "Please select a supported audio file."
+                );
 
-                if (file != juce::File{}) //copies file to library folder
-                {
-                    auto libraryDir = getLibraryDirectory();
-                    auto destFile = libraryDir.getNonexistentChildFile(
-                        file.getFileNameWithoutExtension(),
-                        file.getFileExtension());
-
-                    if (file.copyFileTo(destFile))
-                    {
-                        refreshLibraryList();
-
-                        auto* reader = formatManager.createReaderFor(destFile);
-
-                        if (reader != nullptr)
-                        {
-                            auto newSource =
-                                std::make_unique<juce::AudioFormatReaderSource>(
-                                    reader,
-                                    true
-                                );
-
-                            transportSource.setSource(
-                                newSource.get(),
-                                0,
-                                nullptr,
-                                reader->sampleRate
-                            );
-
-                            playButton.setEnabled(true);
-                            readerSource = std::move(newSource);
-                        }
-                        else
-                        {
-                            juce::AlertWindow::showMessageBoxAsync(
-                                juce::MessageBoxIconType::WarningIcon,
-                                "Playback failed",
-                                "The file was copied to your library, but couldn't be read as audio."
-                            );
-                        }
-                    }
-                    else
-                    {
-                        juce::AlertWindow::showMessageBoxAsync(
-                            juce::MessageBoxIconType::WarningIcon,
-                            "Import failed",
-                            "Couldn't copy that file into your library."
-                        );
-                    }
-                }
+                return;
             }
-        });
+
+            // test reader is no longer needed
+            delete testReader;
+
+            // copy the file into the library
+            auto libraryDir = getLibraryDirectory();
+
+            auto destFile =
+                libraryDir.getNonexistentChildFile(
+                    file.getFileNameWithoutExtension(),
+                    file.getFileExtension()
+                );
+
+            if (!file.copyFileTo(destFile))
+            {
+                juce::AlertWindow::showMessageBoxAsync(
+                    juce::MessageBoxIconType::WarningIcon,
+                    "Import failed",
+                    "Couldn't copy that file into your library."
+                );
+
+                return;
+            }
+
+            // update the library list
+            refreshLibraryList();
+
+            // load the imported track
+            if (!loadTrack(destFile))
+            {
+                juce::AlertWindow::showMessageBoxAsync(
+                    juce::MessageBoxIconType::WarningIcon,
+                    "Playback failed",
+                    "The file was copied to your library, "
+                    "but couldn't be loaded for playback."
+                );
+            }
+        }
+    );
 }
+
+
 
 void MainComponent::playButtonClicked()
 {

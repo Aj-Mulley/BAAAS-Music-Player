@@ -29,6 +29,7 @@ private:
         Stopping
     };
 
+    bool loadTrack(const juce::File& file);
     void changeState(TransportState newState);
     void openButtonClicked();
     void playButtonClicked();
