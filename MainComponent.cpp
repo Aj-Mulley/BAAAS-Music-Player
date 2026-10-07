@@ -1,6 +1,5 @@
 #include "MainComponent.h"
 
-// Window Design and Audio Setup
 MainComponent::MainComponent()
     : state(Stopped)
 {
@@ -10,7 +9,10 @@ MainComponent::MainComponent()
 
     playButton.setButtonText("Play");
     playButton.onClick = [this] { playButtonClicked(); };
-    playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
+    playButton.setColour(
+        juce::TextButton::buttonColourId,
+        juce::Colours::green
+    );
     playButton.setEnabled(false);
     addAndMakeVisible(playButton);
 
@@ -25,7 +27,6 @@ MainComponent::MainComponent()
     setAudioChannels(0, 2);
 
     refreshLibraryList();
-
     //==========================================================================
     // HEAVY METAL VOLUME CONTROL
     //==========================================================================
@@ -44,7 +45,6 @@ MainComponent::MainComponent()
 
     volumeSlider.setTextValueSuffix("%");
 
-    // Heavy metal colors
     volumeSlider.setColour(
         juce::Slider::backgroundColourId,
         juce::Colours::black
@@ -85,7 +85,9 @@ MainComponent::MainComponent()
 
     addAndMakeVisible(volumeSlider);
 
-    // Volume label
+
+    // Volume Label
+
     volumeLabel.setText(
         "VOLUME",
         juce::dontSendNotification
@@ -109,15 +111,23 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    transportSource.stop();
+    transportSource.setSource(nullptr);
     shutdownAudio();
 }
 
-void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
+void MainComponent::prepareToPlay(
+    int samplesPerBlockExpected,
+    double sampleRate)
 {
-    transportSource.prepareToPlay(samplesPerBlockExpected, sampleRate);
+    transportSource.prepareToPlay(
+        samplesPerBlockExpected,
+        sampleRate
+    );
 }
 
-void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
+void MainComponent::getNextAudioBlock(
+    const juce::AudioSourceChannelInfo& bufferToFill)
 {
     if (transportSource.getTotalLength() <= 0)
     {
@@ -135,7 +145,11 @@ void MainComponent::releaseResources()
 
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+    g.fillAll(
+        getLookAndFeel().findColour(
+            juce::ResizableWindow::backgroundColourId
+        )
+    );
 }
 
 void MainComponent::resized()
@@ -144,12 +158,23 @@ void MainComponent::resized()
     playButton.setBounds(100, 10, 80, 30);
     libraryBox.setBounds(10, 50, 300, 30);
 
-    // Heavy Metal Volume Control
-    volumeLabel.setBounds(getWidth() - 150, getHeight() - 270, 100, 30);
-    volumeSlider.setBounds(getWidth() - 140, getHeight() - 235, 80, 190);
+    volumeLabel.setBounds(
+        getWidth() - 150,
+        getHeight() - 270,
+        100,
+        30
+    );
+
+    volumeSlider.setBounds(
+        getWidth() - 140,
+        getHeight() - 235,
+        80,
+        190
+    );
 }
 
-void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
+void MainComponent::changeListenerCallback(
+    juce::ChangeBroadcaster* source)
 {
     if (source == &transportSource)
     {
@@ -162,38 +187,46 @@ void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
 
 void MainComponent::changeState(TransportState newState)
 {
-    if (state != newState)
+    if (state == newState)
+        return;
+
+    state = newState;
+
+    switch (state)
     {
-        state = newState;
+    case Stopped:
+        playButton.setButtonText("Play");
+        playButton.setColour(
+            juce::TextButton::buttonColourId,
+            juce::Colours::green
+        );
+        transportSource.setPosition(0.0);
+        break;
 
-        switch (state)
-        {
-        case Stopped:
-            playButton.setButtonText("Play");
-            playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
-            transportSource.setPosition(0.0);
-            break;
+    case Starting:
+        playButton.setEnabled(true);
+        transportSource.start();
+        break;
 
-        case Starting:
-            playButton.setEnabled(true);
-            transportSource.start();
-            break;
+    case Playing:
+        playButton.setButtonText("Stop");
+        playButton.setColour(
+            juce::TextButton::buttonColourId,
+            juce::Colours::red
+        );
+        break;
 
-        case Playing:
-            playButton.setButtonText("Stop");
-            playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::red);
-            break;
-
-        case Stopping:
-            transportSource.stop();
-            break;
-        }
+    case Stopping:
+        transportSource.stop();
+        break;
     }
 }
 
 juce::File MainComponent::getLibraryDirectory()
 {
-    auto libraryDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    auto libraryDir =
+        juce::File::getSpecialLocation(
+            juce::File::currentExecutableFile)
         .getParentDirectory()
         .getChildFile("library");
 
@@ -209,17 +242,22 @@ void MainComponent::refreshLibraryList()
     libraryBox.clear(juce::dontSendNotification);
 
     auto libraryDir = getLibraryDirectory();
-    auto files = libraryDir.findChildFiles(juce::File::findFiles, false);
 
-    int itemId = 1; // ComboBox IDs must start at 1
+    auto files = libraryDir.findChildFiles(
+        juce::File::findFiles,
+        false
+    );
+
+    int itemId = 1;
 
     for (auto& f : files)
     {
         if (f.getFileName() == ".gitkeep")
             continue;
 
-        libraryFiles.push_back(f);
+        libraryFiles.add(f);
         libraryBox.addItem(f.getFileName(), itemId);
+
         ++itemId;
     }
 }
@@ -228,14 +266,19 @@ void MainComponent::trackSelected()
 {
     auto index = libraryBox.getSelectedId() - 1;
 
-    if (index >= 0 && index < (int)libraryFiles.size())
+    if (index >= 0 &&
+        index < static_cast<int>(libraryFiles.size()))
     {
-        auto& file = libraryFiles[(size_t)index];
+        auto& file = libraryFiles[
+            static_cast<size_t>(index)
+        ];
+
         auto* reader = formatManager.createReaderFor(file);
 
         if (reader != nullptr)
         {
-            changeState(Stopped);
+            transportSource.stop();
+            transportSource.setSource(nullptr);
 
             auto newSource =
                 std::make_unique<juce::AudioFormatReaderSource>(
@@ -250,8 +293,10 @@ void MainComponent::trackSelected()
                 reader->sampleRate
             );
 
-            playButton.setEnabled(true);
             readerSource = std::move(newSource);
+
+            playButton.setEnabled(true);
+            state = Stopped;
         }
         else
         {
@@ -267,8 +312,8 @@ void MainComponent::trackSelected()
 void MainComponent::openButtonClicked()
 {
     auto libraryDirectory = juce::File(__FILE__) //Finds the library internally
-                                .getParentDirectory()
-                                .getChildFile("Library");
+        .getParentDirectory()
+        .getChildFile("Library");
 
     chooser = std::make_unique<juce::FileChooser>(//File explorer music select needs to be deprecated with GUI
         "Select a WAV or MP3 file to play...",
@@ -276,67 +321,67 @@ void MainComponent::openButtonClicked()
         "*.wav;*.mp3;*.flac;*.aiff");
 
     auto fileChooserFlags = juce::FileBrowserComponent::openMode
-                          | juce::FileBrowserComponent::canSelectFiles; //file selector
+        | juce::FileBrowserComponent::canSelectFiles; //file selector
 
     chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
-    {
-        auto file = fc.getResult();
-
-        if (file != juce::File{})//Play features likely to change with play/pause
         {
-            auto* reader = formatManager.createReaderFor(file);
+            auto file = fc.getResult();
 
-            if (file != juce::File{}) //copies file to library folder
+            if (file != juce::File{})//Play features likely to change with play/pause
             {
-                auto libraryDir = getLibraryDirectory();
-                auto destFile = libraryDir.getNonexistentChildFile(
-                    file.getFileNameWithoutExtension(),
-                    file.getFileExtension());
+                auto* reader = formatManager.createReaderFor(file);
 
-                if (file.copyFileTo(destFile))
+                if (file != juce::File{}) //copies file to library folder
                 {
-                    refreshLibraryList();
+                    auto libraryDir = getLibraryDirectory();
+                    auto destFile = libraryDir.getNonexistentChildFile(
+                        file.getFileNameWithoutExtension(),
+                        file.getFileExtension());
 
-                    auto* reader = formatManager.createReaderFor(destFile);
-
-                    if (reader != nullptr)
+                    if (file.copyFileTo(destFile))
                     {
-                        auto newSource =
-                            std::make_unique<juce::AudioFormatReaderSource>(
-                                reader,
-                                true
+                        refreshLibraryList();
+
+                        auto* reader = formatManager.createReaderFor(destFile);
+
+                        if (reader != nullptr)
+                        {
+                            auto newSource =
+                                std::make_unique<juce::AudioFormatReaderSource>(
+                                    reader,
+                                    true
+                                );
+
+                            transportSource.setSource(
+                                newSource.get(),
+                                0,
+                                nullptr,
+                                reader->sampleRate
                             );
 
-                        transportSource.setSource(
-                            newSource.get(),
-                            0,
-                            nullptr,
-                            reader->sampleRate
-                        );
-
-                        playButton.setEnabled(true);
-                        readerSource = std::move(newSource);
+                            playButton.setEnabled(true);
+                            readerSource = std::move(newSource);
+                        }
+                        else
+                        {
+                            juce::AlertWindow::showMessageBoxAsync(
+                                juce::MessageBoxIconType::WarningIcon,
+                                "Playback failed",
+                                "The file was copied to your library, but couldn't be read as audio."
+                            );
+                        }
                     }
                     else
                     {
                         juce::AlertWindow::showMessageBoxAsync(
                             juce::MessageBoxIconType::WarningIcon,
-                            "Playback failed",
-                            "The file was copied to your library, but couldn't be read as audio."
+                            "Import failed",
+                            "Couldn't copy that file into your library."
                         );
                     }
                 }
-                else
-                {
-                    juce::AlertWindow::showMessageBoxAsync(
-                        juce::MessageBoxIconType::WarningIcon,
-                        "Import failed",
-                        "Couldn't copy that file into your library."
-                    );
-                }
             }
-        }
-    });
+        });
 }
 
 void MainComponent::playButtonClicked()

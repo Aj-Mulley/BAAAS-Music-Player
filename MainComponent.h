@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-//Functions Declarations
+//Functions Declarations 
 class MainComponent : public juce::AudioAppComponent,
     public juce::ChangeListener
 {
@@ -10,13 +10,15 @@ public:
     ~MainComponent() override;
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
+    void getNextAudioBlock(
+        const juce::AudioSourceChannelInfo& bufferToFill) override;
     void releaseResources() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+    void changeListenerCallback(
+        juce::ChangeBroadcaster* source) override;
 
 private:
     enum TransportState
@@ -30,26 +32,29 @@ private:
     void changeState(TransportState newState);
     void openButtonClicked();
     void playButtonClicked();
-    juce::File getLibraryDirectory();
-    void refreshLibraryList();
     void trackSelected();
 
+    juce::File getLibraryDirectory();
+    void refreshLibraryList();
+
+
+    // Heavy Metal Volume Control
     juce::TextButton openButton;
     juce::TextButton playButton;
     juce::ComboBox libraryBox;
 
-    // Heavy Metal Volume Control
     juce::Slider volumeSlider;
     juce::Label volumeLabel;
 
     juce::AudioFormatManager formatManager;
-    std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
     juce::AudioTransportSource transportSource;
-    TransportState state;
 
+    std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
     std::unique_ptr<juce::FileChooser> chooser;
 
-    std::vector<juce::File> libraryFiles; //maps combobox item IDs to files
+    juce::Array<juce::File> libraryFiles; //maps combobox item ids to files
+
+    TransportState state;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
