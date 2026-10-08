@@ -38,6 +38,8 @@ private:
     juce::Slider volumeSlider;
     juce::Label volumeLabel;
 
+    juce::ImageComponent soundIcon;
+
     juce::AudioFormatManager formatManager;
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
     juce::AudioTransportSource transportSource;

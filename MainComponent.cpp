@@ -17,7 +17,7 @@ MainComponent::MainComponent()
     formatManager.registerBasicFormats();
     transportSource.addChangeListener(this);
 
-    setSize(600, 300);
+    setSize(1500, 750);
     setAudioChannels(0, 2);
 
     //==========================================================================
@@ -99,6 +99,10 @@ MainComponent::MainComponent()
     );
 
     addAndMakeVisible(volumeLabel);
+
+    auto soundButton = juce::ImageCache::getFromMemory(BinaryData::Speaker_Icon_png, BinaryData::Speaker_Icon_pngSize);
+    soundIcon.setImage(soundButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(soundIcon);
 }
 
 MainComponent::~MainComponent()
@@ -129,17 +133,34 @@ void MainComponent::releaseResources()
 
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+    //background
+    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));  
+
+    //volume bar background
+    g.setColour(juce::Colour(0xff56009E));
+    g.drawRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10, 5);
+    g.setColour(juce::Colour(0xff6800BD));
+    g.fillRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10);
+
+    //play button background
+    g.setColour(juce::Colour(0xff56009E));
+    g.drawRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10, 5);
+    g.setColour(juce::Colour(0xff6800BD));
+    g.fillRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10);
+    
 }
 
 void MainComponent::resized()
 {
+    //open music files
     openButton.setBounds(10, 10, 80, 30);
-    playButton.setBounds(100, 10, 80, 30);
+
+    //play button
+    playButton.setBounds((getWidth() / 2) - 40, getHeight() - 100, 80, 30);
 
     // Heavy Metal Volume Control
-    volumeLabel.setBounds(getWidth() - 150, getHeight() - 270, 100, 30);
-    volumeSlider.setBounds(getWidth() - 140, getHeight() - 235, 80, 190);
+    volumeSlider.setBounds(getWidth() - 90, getHeight() - 360, 80, 190);
+    soundIcon.setBounds(getWidth() - 65, getHeight() - 395, 30, 30);
 }
 
 void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
@@ -186,47 +207,42 @@ void MainComponent::changeState(TransportState newState)
 
 void MainComponent::openButtonClicked()
 {
-    chooser = std::make_unique<juce::FileChooser>(
+    auto libraryDirectory = juce::File(__FILE__) //Finds the library internally
+                                .getParentDirectory()
+                                .getChildFile("Library");
+
+    chooser = std::make_unique<juce::FileChooser>(//File explorer music select needs to be deprecated with GUI
         "Select a WAV or MP3 file to play...",
-        juce::File{},
-        "*.wav;*.mp3;*.flac;*.aiff"
-    );
+        libraryDirectory,
+        "*.wav;*.mp3;*.flac;*.aiff");
 
-    auto folderChooserFlags =
-        juce::FileBrowserComponent::openMode |
-        juce::FileBrowserComponent::canSelectFiles;
+    auto fileChooserFlags = juce::FileBrowserComponent::openMode
+                          | juce::FileBrowserComponent::canSelectFiles; //file selector
 
-    chooser->launchAsync(
-        folderChooserFlags,
-        [this](const juce::FileChooser& fc)
+    chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
+    {
+        auto file = fc.getResult();
+
+        if (file != juce::File{})//Play features likely to change with play/pause
         {
-            auto file = fc.getResult();
+            auto* reader = formatManager.createReaderFor(file);
 
-            if (file != juce::File{})
+            if (reader != nullptr)
             {
-                auto* reader = formatManager.createReaderFor(file);
+                auto newSource = std::make_unique<juce::AudioFormatReaderSource>(
+                    reader, true);
 
-                if (reader != nullptr)
-                {
-                    auto newSource =
-                        std::make_unique<juce::AudioFormatReaderSource>(
-                            reader,
-                            true
-                        );
+                transportSource.setSource(
+                    newSource.get(),
+                    0,
+                    nullptr,
+                    reader->sampleRate);
 
-                    transportSource.setSource(
-                        newSource.get(),
-                        0,
-                        nullptr,
-                        reader->sampleRate
-                    );
-
-                    playButton.setEnabled(true);
-                    readerSource = std::move(newSource);
-                }
+                playButton.setEnabled(true);
+                readerSource = std::move(newSource);
             }
         }
-    );
+    });
 }
 
 void MainComponent::playButtonClicked()
