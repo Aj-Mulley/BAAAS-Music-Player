@@ -38,6 +38,29 @@ private:
     juce::File getLibraryDirectory();
     void refreshLibraryList();
 
+    // =========================================================
+    // ONLINE MUSIC INFORMATION
+    // =========================================================
+
+    void fetchOnlineMusicInfo(
+        juce::String title,
+        juce::String artist,
+        juce::String album,
+        double duration);
+
+    void updateMusicInfo(
+        const juce::String& title,
+        const juce::String& artist,
+        const juce::String& album,
+        const juce::String& lyrics,
+        const juce::Image& artwork);
+
+    juce::String parseArtistFromFileName(
+        const juce::String& fileName);
+
+    juce::String parseTitleFromFileName(
+        const juce::String& fileName);
+
 
     // Heavy Metal Volume Control
     juce::TextButton openButton;
@@ -46,6 +69,26 @@ private:
 
     juce::Slider volumeSlider;
     juce::Label volumeLabel;
+
+
+    // =========================================================
+    // SONG INFORMATION UI
+    // =========================================================
+
+    juce::Label songTitleLabel;
+    juce::Label artistLabel;
+    juce::Label albumLabel;
+
+    juce::TextButton lyricsButton;
+    juce::TextEditor lyricsEditor;
+
+    bool lyricsExpanded = false;
+
+    juce::ImageComponent albumArtComponent;
+    juce::Image albumArt;
+
+    juce::Label onlineStatusLabel;
+
 
     juce::AudioFormatManager formatManager;
     juce::AudioTransportSource transportSource;
