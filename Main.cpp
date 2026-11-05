@@ -7,6 +7,7 @@
 */
 
 #include "MainComponent.h" 
+#include "TicketMaster.cpp"
 
 //============================================================================== 
 class NewProjectApplication : public juce::JUCEApplication
@@ -25,6 +26,7 @@ public:
         // This method is where you should put your application's initialisation code.. 
 
         mainWindow.reset(new MainWindow(getApplicationName()));
+        getTicketmasterEvent();
     }
 
     void shutdown() override
