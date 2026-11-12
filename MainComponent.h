@@ -4,7 +4,8 @@
 #include <JuceHeader.h>
 //Functions Declarations 
 class MainComponent : public juce::AudioAppComponent,
-    public juce::ChangeListener
+    public juce::ChangeListener,
+    public juce::Timer
 {
 public:
     MainComponent();
@@ -17,6 +18,10 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+
+    void timerCallback() override;
+
+    bool keyPressed(const juce::KeyPress& key) override;
 
     void changeListenerCallback(
         juce::ChangeBroadcaster* source) override;
@@ -35,6 +40,8 @@ private:
     void changeState(TransportState newState);
     void openButtonClicked();
     void playButtonClicked();
+    void seekBySeconds(double seconds);
+    juce::String formatTime(double seconds);
     void trackSelected();
     
 
@@ -72,6 +79,11 @@ private:
     juce::TextButton badButton;
 
     juce::Slider volumeSlider;
+    // SONG PROGRESS BAR
+    juce::Slider progressSlider;
+
+    juce::Label currentTimeLabel;
+    juce::Label totalTimeLabel;
     juce::Label volumeLabel;
 
     // =========================================================
