@@ -8,16 +8,7 @@ MainComponent::MainComponent()
     openButton.onClick = [this] { openButtonClicked(); };
     addAndMakeVisible(openButton);
 
-    playButton.setButtonText("Play");
-    playButton.onClick = [this] { playButtonClicked(); };
-    playButton.setColour(
-        juce::TextButton::buttonColourId,
-        juce::Colours::green
-    );
-    playButton.setEnabled(false);
-    addAndMakeVisible(playButton);
-
-    // =========================================================
+// =========================================================
 // SONG PROGRESS BAR
 // =========================================================
 
@@ -103,6 +94,21 @@ MainComponent::MainComponent()
     );
 
     addAndMakeVisible(totalTimeLabel);
+ // =========================================================
+ // PLAY AND PAUSE BUTTON
+ // =========================================================
+
+    auto playButton = juce::ImageCache::getFromMemory(BinaryData::Play_png, BinaryData::Play_pngSize);
+    playIcon.setImage(playButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(playIcon);
+    playIcon.setVisible(true);
+    playIcon.addMouseListener(this, true);
+
+    auto pauseButton = juce::ImageCache::getFromMemory(BinaryData::Pause_png, BinaryData::Pause_pngSize);
+    pauseIcon.setImage(pauseButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(pauseIcon);
+    pauseIcon.setVisible(false);
+    pauseIcon.addMouseListener(this, true);
 
     libraryBox.setTextWhenNothingSelected("Library (empty)");
     libraryBox.onChange = [this] { trackSelected(); };
@@ -315,8 +321,7 @@ MainComponent::MainComponent()
         juce::Justification::centred
     );
 
-    // Online lookup remains active, but its status text is hidden.
-    // (No addAndMakeVisible call for onlineStatusLabel.)
+    addAndMakeVisible(onlineStatusLabel);
 
 
     setSize(1100, 700);
@@ -418,13 +423,16 @@ MainComponent::MainComponent()
 
     // Update playback progress 10 times per second
     startTimerHz(10);
+    
+    //KEEP THIS AT THE BOTTOM
+    DBG("Your mom");
+    setSize(1100, 700);
+    resized();
 }
 
 
 MainComponent::~MainComponent()
 {
-
-    stopTimer();
     transportSource.stop();
     transportSource.setSource(nullptr);
     readerSource.reset();
@@ -465,23 +473,30 @@ void MainComponent::releaseResources()
 
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(
-        getLookAndFeel().findColour(
-            juce::ResizableWindow::backgroundColourId
-        )
-    );
+    g.fillAll(juce::Colour(0xff171717));
 
     //volume bar background
-    g.setColour(juce::Colour(0xff56009E));
+    g.setColour(lighterPurple);
     g.drawRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10, 5);
-    g.setColour(juce::Colour(0xff6800BD));
+    g.setColour(purple);
     g.fillRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10);
 
     //play button background
-    g.setColour(juce::Colour(0xff56009E));
+    g.setColour(lighterPurple);
     g.drawRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10, 5);
-    g.setColour(juce::Colour(0xff6800BD));
+    g.setColour(purple);
     g.fillRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10);
+    
+    
+    if (albumArt.isNull() == false) {
+        //album cover background
+        g.setColour(lighterPurple);
+        g.drawRoundedRectangle((getWidth() / 2) - 150, 70, 300, 300, 0, 10);
+        repaint();
+    }
+
+    g.setColour(juce::Colour(0xff000000));
+    g.drawRect(onlineStatusLabel.getX(), onlineStatusLabel.getY(), onlineStatusLabel.getWidth(), onlineStatusLabel.getHeight());
 
 }
 
@@ -495,41 +510,18 @@ void MainComponent::resized()
         30
     );
 
-    playButton.setBounds(
+    playIcon.setBounds(
+        (getWidth() / 2) - 40,
+        getHeight() - 100,
+        80, 
+        80
+    );
+
+    pauseIcon.setBounds(
         (getWidth() / 2) - 40,
         getHeight() - 100,
         80,
         30
-    );
-
-    // =========================================================
-// CENTERED SONG PROGRESS BAR
-// =========================================================
-
-    int progressWidth = 500;
-
-    int progressX =
-        (getWidth() - progressWidth) / 2;
-
-    currentTimeLabel.setBounds(
-        progressX - 55,
-        getHeight() - 65,
-        50,
-        25
-    );
-
-    progressSlider.setBounds(
-        (getWidth() - 500) / 2,
-        getHeight() - 55,
-        500,
-        20
-    );
-
-    totalTimeLabel.setBounds(
-        progressX + progressWidth + 5,
-        getHeight() - 65,
-        50,
-        25
     );
 
     libraryBox.setBounds(
@@ -569,13 +561,10 @@ void MainComponent::resized()
         lyricsEditor.setVisible(true);
 
         lyricsEditor.setBounds(
-            30,
-            420,
-            300,
-            juce::jmax(
-                0,
-                juce::jmin(150, getHeight() - 550)
-            )
+            lyricsButton.getX(),
+            lyricsButton.getY() + 40,
+            250,
+            260
         );
     }
     else
@@ -621,8 +610,12 @@ void MainComponent::resized()
     // ONLINE STATUS
     // =========================================================
 
-    // Online status label intentionally has no visible bounds.
-
+    onlineStatusLabel.setBounds(
+        getWidth() - onlineStatusLabel.getWidth() - 10,
+        getHeight() - 25,
+        150,
+        25
+    );
 
 
     // =========================================================
@@ -637,8 +630,8 @@ void MainComponent::resized()
     );
 
     volumeSlider.setBounds(getWidth() - 90,
-        getHeight() - 360,
-        80,
+        getHeight() - 360, 
+        80, 
         190
     );
 
@@ -880,28 +873,6 @@ bool MainComponent::loadTrack(
     // Reset playback state
     transportSource.setPosition(0.0);
     state = Stopped;
-
-    // Reset progress display for new track
-    progressSlider.setRange(
-        0.0,
-        transportSource.getLengthInSeconds(),
-        0.01
-    );
-
-    progressSlider.setValue(
-        0.0,
-        juce::dontSendNotification
-    );
-
-    currentTimeLabel.setText(
-        "00:00",
-        juce::dontSendNotification
-    );
-
-    totalTimeLabel.setText(
-        formatTime(transportSource.getLengthInSeconds()),
-        juce::dontSendNotification
-    );
 
 
     playButton.setButtonText("Play");
