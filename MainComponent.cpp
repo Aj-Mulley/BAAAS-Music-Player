@@ -8,6 +8,22 @@ MainComponent::MainComponent()
     openButton.onClick = [this] { openButtonClicked(); };
     addAndMakeVisible(openButton);
 
+ // =========================================================
+ // PLAY AND PAUSE BUTTON
+ // =========================================================
+
+    auto playButton = juce::ImageCache::getFromMemory(BinaryData::Play_png, BinaryData::Play_pngSize);
+    playIcon.setImage(playButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(playIcon);
+    playIcon.setVisible(true);
+    playIcon.addMouseListener(this, true);
+
+    auto pauseButton = juce::ImageCache::getFromMemory(BinaryData::Pause_png, BinaryData::Pause_pngSize);
+    pauseIcon.setImage(pauseButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(pauseIcon);
+    pauseIcon.setVisible(false);
+    pauseIcon.addMouseListener(this, true);
+
     playButton.setButtonText("Play");
     playButton.onClick = [this] { playButtonClicked(); };
     playButton.setColour(
@@ -111,6 +127,9 @@ MainComponent::MainComponent()
     formatManager.registerBasicFormats();
     transportSource.addChangeListener(this);
 
+    auto soundButton = juce::ImageCache::getFromMemory(BinaryData::Speaker_Icon_png, BinaryData::Speaker_Icon_pngSize);
+    soundIcon.setImage(soundButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(soundIcon);
     // =========================================================
     // SONG INFORMATION UI
     // =========================================================
@@ -319,7 +338,7 @@ MainComponent::MainComponent()
     // (No addAndMakeVisible call for onlineStatusLabel.)
 
 
-    setSize(1100, 700);
+    
 
     setAudioChannels(0, 2);
 
@@ -411,6 +430,11 @@ MainComponent::MainComponent()
     );
 
     addAndMakeVisible(volumeLabel);
+    
+    //KEEP THIS AT THE BOTTOM
+    DBG("Your mom");
+    setSize(1100, 700);
+    resized();
 
     // Keyboard controls
     setWantsKeyboardFocus(true);
@@ -462,9 +486,57 @@ void MainComponent::releaseResources()
     transportSource.releaseResources();
 }
 
+void MainComponent::mouseDown(const juce::MouseEvent& event)
+{
+    auto location = event.getMouseDownPosition();
+    auto clickBounds = playIcon.getLocalBounds();
+    if (state == Playing) 
+        clickBounds = pauseIcon.getLocalBounds(); 
+    DBG(clickBounds.getX() + "," + clickBounds.getY());
+    DBG("Your mom");
+
+    if (clickBounds.contains(location.getX(), location.getY()) && state == Stopped)
+    {
+        playIcon.setVisible(false);
+        pauseIcon.setVisible(true);
+        playButtonClicked();
+        DBG("hi");
+    }
+    if (clickBounds.contains(location.getX(), location.getY()) && state == Playing)
+    {
+        playIcon.setVisible(true);
+        pauseIcon.setVisible(false);
+        playButtonClicked();
+        DBG("bye");
+    }
+}
 
 void MainComponent::paint(juce::Graphics& g)
 {
+    g.fillAll(juce::Colour(0xff171717));
+
+    //volume bar background
+    g.setColour(lighterPurple);
+    g.drawRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10, 5);
+    g.setColour(purple);
+    g.fillRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10);
+
+    //play button background
+    g.setColour(lighterPurple);
+    g.drawRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10, 5);
+    g.setColour(purple);
+    g.fillRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10);
+    
+    
+    if (albumArt.isNull() == false) {
+        //album cover background
+        g.setColour(lighterPurple);
+        g.drawRoundedRectangle((getWidth() / 2) - 150, 70, 300, 300, 0, 10);
+        repaint();
+    }
+
+    g.setColour(juce::Colour(0xff000000));
+    g.drawRect(onlineStatusLabel.getX(), onlineStatusLabel.getY(), onlineStatusLabel.getWidth(), onlineStatusLabel.getHeight());
     g.fillAll(
         getLookAndFeel().findColour(
             juce::ResizableWindow::backgroundColourId
@@ -495,11 +567,19 @@ void MainComponent::resized()
         30
     );
 
+    playIcon.setBounds(
+        (getWidth() / 2) - 40,
+        getHeight() - 100,
+        80, 
+        80
+    );
+
+    pauseIcon.setBounds(
     playButton.setBounds(
         (getWidth() / 2) - 40,
         getHeight() - 100,
         80,
-        30
+        80
     );
 
     // =========================================================
@@ -533,8 +613,8 @@ void MainComponent::resized()
     );
 
     libraryBox.setBounds(
-        190,
         10,
+        50,
         300,
         30
     );
@@ -545,7 +625,7 @@ void MainComponent::resized()
     // =========================================================
 
     albumArtComponent.setBounds(
-        30,
+        (getWidth() / 2) - 150,
         70,
         300,
         300
@@ -557,9 +637,9 @@ void MainComponent::resized()
     // =========================================================
 
     lyricsButton.setBounds(
-        30,
-        380,
-        300,
+        albumArtComponent.getX() + albumArtComponent.getWidth() + 10,
+        70,
+        250,
         35
     );
 
@@ -569,6 +649,10 @@ void MainComponent::resized()
         lyricsEditor.setVisible(true);
 
         lyricsEditor.setBounds(
+            lyricsButton.getX(),
+            lyricsButton.getY() + 40,
+            250,
+            260
             30,
             420,
             300,
@@ -596,31 +680,36 @@ void MainComponent::resized()
     // =========================================================
 
     songTitleLabel.setBounds(
-        350,
-        75,
+        (getWidth() / 2) - (songTitleLabel.getWidth() / 2),
+        albumArtComponent.getY() + albumArtComponent.getHeight() + 10,
         500,
         40
     );
 
     artistLabel.setBounds(
-        350,
-        120,
+        (getWidth() / 2) - (artistLabel.getWidth() / 2),
+        albumArtComponent.getY() + albumArtComponent.getHeight() + 40,
         500,
         30
     );
 
     albumLabel.setBounds(
-        350,
-        155,
+        (getWidth() / 2) - (albumLabel.getWidth() / 2),
+        albumArtComponent.getY() + albumArtComponent.getHeight() + 60,
         500,
         30
     );
-
-
+    
     // =========================================================
     // ONLINE STATUS
     // =========================================================
 
+    onlineStatusLabel.setBounds(
+        getWidth() - onlineStatusLabel.getWidth() - 10,
+        getHeight() - 25,
+        150,
+        25
+    );
     // Online status label intentionally has no visible bounds.
 
 
@@ -632,11 +721,14 @@ void MainComponent::resized()
     playButton.setBounds(
         (getWidth() / 2) - 40,
         getHeight() - 100,
+        80, 
         80,
         30
     );
 
     volumeSlider.setBounds(getWidth() - 90,
+        getHeight() - 360, 
+        80, 
         getHeight() - 360,
         80,
         190
@@ -648,6 +740,8 @@ void MainComponent::resized()
         30,
         30
     );
+
+    
 }
 
 
@@ -799,7 +893,7 @@ bool MainComponent::loadTrack(
 
     if (reader == nullptr)
         return false;
-
+    
 
     // =========================================================
     // READ EMBEDDED SONG INFORMATION
@@ -1673,6 +1767,7 @@ void MainComponent::playButtonClicked()
 
     else if (state == Playing)
         changeState(Stopping);
+}
 }
 
 // =========================================================
