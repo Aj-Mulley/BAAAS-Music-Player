@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <JuceHeader.h>
 //Functions Declarations 
 class MainComponent : public juce::AudioAppComponent,
@@ -26,7 +25,6 @@ public:
     void changeListenerCallback(
         juce::ChangeBroadcaster* source) override;
 
-    void mouseDown(const juce::MouseEvent& event) override;
 private:
     enum TransportState
     {
@@ -43,7 +41,6 @@ private:
     void seekBySeconds(double seconds);
     juce::String formatTime(double seconds);
     void trackSelected();
-    
 
     juce::File getLibraryDirectory();
     void refreshLibraryList();
@@ -76,7 +73,6 @@ private:
     juce::TextButton openButton;
     juce::TextButton playButton;
     juce::ComboBox libraryBox;
-    juce::TextButton badButton;
 
     juce::Slider volumeSlider;
     // SONG PROGRESS BAR
@@ -85,6 +81,7 @@ private:
     juce::Label currentTimeLabel;
     juce::Label totalTimeLabel;
     juce::Label volumeLabel;
+
 
     // =========================================================
     // SONG INFORMATION UI
@@ -98,9 +95,6 @@ private:
     juce::TextEditor lyricsEditor;
 
     bool lyricsExpanded = false;
-
-    juce::Colour purple = juce::Colour(0xff6800BD);
-    juce::Colour lighterPurple = juce::Colour(0xff56009E);
 
     juce::ImageComponent albumArtComponent;
     juce::Image albumArt;
@@ -117,8 +111,6 @@ private:
     juce::Array<juce::File> libraryFiles; //maps combobox item ids to files
 
     juce::ImageComponent soundIcon;
-    juce::ImageComponent playIcon;
-    juce::ImageComponent pauseIcon;
 
     TransportState state;
 
