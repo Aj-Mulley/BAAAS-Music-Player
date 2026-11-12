@@ -1,56 +1,6 @@
 #pragma once
 
-#include <JuceHeader.h>
-// Functions Declarations
-class MainComponent : public juce::AudioAppComponent,
-    public juce::ChangeListener
-{
-public:
-    MainComponent();
-    ~MainComponent() override;
-
-    void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
-    void releaseResources() override;
-
-    void paint(juce::Graphics& g) override;
-    void resized() override;
-
-    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
-
-private:
-    enum TransportState
-    {
-        Stopped,
-        Starting,
-        Playing,
-        Stopping
-    };
-
-    void changeState(TransportState newState);
-    void openButtonClicked();
-    void playButtonClicked();
-
-    juce::TextButton openButton;
-    juce::TextButton playButton;
-
-    // Heavy Metal Volume Control
-    juce::Slider volumeSlider;
-    juce::Label volumeLabel;
-
-    juce::ImageComponent soundIcon;
-
-    juce::AudioFormatManager formatManager;
-    std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
-    juce::AudioTransportSource transportSource;
-    TransportState state;
-
-    std::unique_ptr<juce::FileChooser> chooser;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
-};
-#pragma once
-
+#include <iostream>
 #include <JuceHeader.h>
 //Functions Declarations 
 class MainComponent : public juce::AudioAppComponent,
@@ -71,6 +21,7 @@ public:
     void changeListenerCallback(
         juce::ChangeBroadcaster* source) override;
 
+    void mouseDown(const juce::MouseEvent& event) override;
 private:
     enum TransportState
     {
@@ -85,6 +36,7 @@ private:
     void openButtonClicked();
     void playButtonClicked();
     void trackSelected();
+    
 
     juce::File getLibraryDirectory();
     void refreshLibraryList();
@@ -117,10 +69,10 @@ private:
     juce::TextButton openButton;
     juce::TextButton playButton;
     juce::ComboBox libraryBox;
+    juce::TextButton badButton;
 
     juce::Slider volumeSlider;
     juce::Label volumeLabel;
-
 
     // =========================================================
     // SONG INFORMATION UI
@@ -135,6 +87,9 @@ private:
 
     bool lyricsExpanded = false;
 
+    juce::Colour purple = juce::Colour(0xff6800BD);
+    juce::Colour lighterPurple = juce::Colour(0xff56009E);
+
     juce::ImageComponent albumArtComponent;
     juce::Image albumArt;
 
@@ -148,6 +103,10 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 
     juce::Array<juce::File> libraryFiles; //maps combobox item ids to files
+
+    juce::ImageComponent soundIcon;
+    juce::ImageComponent playIcon;
+    juce::ImageComponent pauseIcon;
 
     TransportState state;
 

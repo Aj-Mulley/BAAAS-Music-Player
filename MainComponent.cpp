@@ -1,261 +1,5 @@
 #include "MainComponent.h"
 
-// Window Design and Audio Setup
-MainComponent::MainComponent()
-    : state(Stopped)
-{
-    openButton.setButtonText("Open...");
-    openButton.onClick = [this] { openButtonClicked(); };
-    addAndMakeVisible(openButton);
-
-    playButton.setButtonText("Play");
-    playButton.onClick = [this] { playButtonClicked(); };
-    playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
-    playButton.setEnabled(false);
-    addAndMakeVisible(playButton);
-
-    formatManager.registerBasicFormats();
-    transportSource.addChangeListener(this);
-
-    setSize(1500, 750);
-    setAudioChannels(0, 2);
-
-    //==========================================================================
-    // HEAVY METAL VOLUME CONTROL
-    //==========================================================================
-
-    volumeSlider.setRange(0.0, 100.0, 1.0);
-    volumeSlider.setValue(75.0);
-
-    volumeSlider.setSliderStyle(juce::Slider::LinearVertical);
-
-    volumeSlider.setTextBoxStyle(
-        juce::Slider::TextBoxBelow,
-        false,
-        70,
-        25
-    );
-
-    volumeSlider.setTextValueSuffix("%");
-
-    // Heavy metal colors
-    volumeSlider.setColour(
-        juce::Slider::backgroundColourId,
-        juce::Colours::black
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::trackColourId,
-        juce::Colours::darkgrey
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::thumbColourId,
-        juce::Colours::red
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::textBoxTextColourId,
-        juce::Colours::white
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::textBoxBackgroundColourId,
-        juce::Colours::black
-    );
-
-    volumeSlider.setColour(
-        juce::Slider::textBoxOutlineColourId,
-        juce::Colours::darkgrey
-    );
-
-    // Actually change the music volume
-    volumeSlider.onValueChange = [this]
-        {
-            transportSource.setGain(
-                static_cast<float>(volumeSlider.getValue() / 100.0)
-            );
-        };
-
-    addAndMakeVisible(volumeSlider);
-
-    // Volume label
-    volumeLabel.setText(
-        "VOLUME",
-        juce::dontSendNotification
-    );
-
-    volumeLabel.setColour(
-        juce::Label::textColourId,
-        juce::Colours::white
-    );
-
-    volumeLabel.setFont(
-        juce::Font(18.0f, juce::Font::bold)
-    );
-
-    volumeLabel.setJustificationType(
-        juce::Justification::centred
-    );
-
-    addAndMakeVisible(volumeLabel);
-
-    auto soundButton = juce::ImageCache::getFromMemory(BinaryData::Speaker_Icon_png, BinaryData::Speaker_Icon_pngSize);
-    soundIcon.setImage(soundButton, juce::RectanglePlacement::stretchToFit);
-    addAndMakeVisible(soundIcon);
-}
-
-MainComponent::~MainComponent()
-{
-    shutdownAudio();
-}
-
-void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
-{
-    transportSource.prepareToPlay(samplesPerBlockExpected, sampleRate);
-}
-
-void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
-{
-    if (transportSource.getTotalLength() <= 0)
-    {
-        bufferToFill.clearActiveBufferRegion();
-        return;
-    }
-
-    transportSource.getNextAudioBlock(bufferToFill);
-}
-
-void MainComponent::releaseResources()
-{
-    transportSource.releaseResources();
-}
-
-void MainComponent::paint(juce::Graphics& g)
-{
-    //background
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));  
-
-    //volume bar background
-    g.setColour(juce::Colour(0xff56009E));
-    g.drawRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10, 5);
-    g.setColour(juce::Colour(0xff6800BD));
-    g.fillRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10);
-
-    //play button background
-    g.setColour(juce::Colour(0xff56009E));
-    g.drawRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10, 5);
-    g.setColour(juce::Colour(0xff6800BD));
-    g.fillRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10);
-    
-}
-
-void MainComponent::resized()
-{
-    //open music files
-    openButton.setBounds(10, 10, 80, 30);
-
-    //play button
-    playButton.setBounds((getWidth() / 2) - 40, getHeight() - 100, 80, 30);
-
-    // Heavy Metal Volume Control
-    volumeSlider.setBounds(getWidth() - 90, getHeight() - 360, 80, 190);
-    soundIcon.setBounds(getWidth() - 65, getHeight() - 395, 30, 30);
-}
-
-void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
-{
-    if (source == &transportSource)
-    {
-        if (transportSource.isPlaying())
-            changeState(Playing);
-        else
-            changeState(Stopped);
-    }
-}
-
-void MainComponent::changeState(TransportState newState)
-{
-    if (state != newState)
-    {
-        state = newState;
-
-        switch (state)
-        {
-        case Stopped:
-            playButton.setButtonText("Play");
-            playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
-            transportSource.setPosition(0.0);
-            break;
-
-        case Starting:
-            playButton.setEnabled(true);
-            transportSource.start();
-            break;
-
-        case Playing:
-            playButton.setButtonText("Stop");
-            playButton.setColour(juce::TextButton::buttonColourId, juce::Colours::red);
-            break;
-
-        case Stopping:
-            transportSource.stop();
-            break;
-        }
-    }
-}
-
-void MainComponent::openButtonClicked()
-{
-    auto libraryDirectory = juce::File(__FILE__) //Finds the library internally
-                                .getParentDirectory()
-                                .getChildFile("Library");
-
-    chooser = std::make_unique<juce::FileChooser>(//File explorer music select needs to be deprecated with GUI
-        "Select a WAV or MP3 file to play...",
-        libraryDirectory,
-        "*.wav;*.mp3;*.flac;*.aiff");
-
-    auto fileChooserFlags = juce::FileBrowserComponent::openMode
-                          | juce::FileBrowserComponent::canSelectFiles; //file selector
-
-    chooser->launchAsync(fileChooserFlags, [this](const juce::FileChooser& fc)
-    {
-        auto file = fc.getResult();
-
-        if (file != juce::File{})//Play features likely to change with play/pause
-        {
-            auto* reader = formatManager.createReaderFor(file);
-
-            if (reader != nullptr)
-            {
-                auto newSource = std::make_unique<juce::AudioFormatReaderSource>(
-                    reader, true);
-
-                transportSource.setSource(
-                    newSource.get(),
-                    0,
-                    nullptr,
-                    reader->sampleRate);
-
-                playButton.setEnabled(true);
-                readerSource = std::move(newSource);
-            }
-        }
-    });
-}
-
-void MainComponent::playButtonClicked()
-{
-    if (state == Stopped)
-        changeState(Starting);
-    else if (state == Playing)
-        changeState(Stopping);
-}
-#include "MainComponent.h"
-#include <thread>
-
-
 MainComponent::MainComponent()
     : state(Stopped),
     lyricsExpanded(false)
@@ -264,14 +8,21 @@ MainComponent::MainComponent()
     openButton.onClick = [this] { openButtonClicked(); };
     addAndMakeVisible(openButton);
 
-    playButton.setButtonText("Play");
-    playButton.onClick = [this] { playButtonClicked(); };
-    playButton.setColour(
-        juce::TextButton::buttonColourId,
-        juce::Colours::green
-    );
-    playButton.setEnabled(false);
-    addAndMakeVisible(playButton);
+ // =========================================================
+ // PLAY AND PAUSE BUTTON
+ // =========================================================
+
+    auto playButton = juce::ImageCache::getFromMemory(BinaryData::Play_png, BinaryData::Play_pngSize);
+    playIcon.setImage(playButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(playIcon);
+    playIcon.setVisible(true);
+    playIcon.addMouseListener(this, true);
+
+    auto pauseButton = juce::ImageCache::getFromMemory(BinaryData::Pause_png, BinaryData::Pause_pngSize);
+    pauseIcon.setImage(pauseButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(pauseIcon);
+    pauseIcon.setVisible(false);
+    pauseIcon.addMouseListener(this, true);
 
     libraryBox.setTextWhenNothingSelected("Library (empty)");
     libraryBox.onChange = [this] { trackSelected(); };
@@ -280,6 +31,9 @@ MainComponent::MainComponent()
     formatManager.registerBasicFormats();
     transportSource.addChangeListener(this);
 
+    auto soundButton = juce::ImageCache::getFromMemory(BinaryData::Speaker_Icon_png, BinaryData::Speaker_Icon_pngSize);
+    soundIcon.setImage(soundButton, juce::RectanglePlacement::stretchToFit);
+    addAndMakeVisible(soundIcon);
     // =========================================================
     // SONG INFORMATION UI
     // =========================================================
@@ -487,7 +241,7 @@ MainComponent::MainComponent()
     addAndMakeVisible(onlineStatusLabel);
 
 
-    setSize(1100, 700);
+    
 
     setAudioChannels(0, 2);
 
@@ -579,6 +333,11 @@ MainComponent::MainComponent()
     );
 
     addAndMakeVisible(volumeLabel);
+    
+    //KEEP THIS AT THE BOTTOM
+    DBG("Your mom");
+    setSize(1100, 700);
+    resized();
 }
 
 
@@ -621,14 +380,58 @@ void MainComponent::releaseResources()
     transportSource.releaseResources();
 }
 
+void MainComponent::mouseDown(const juce::MouseEvent& event)
+{
+    auto location = event.getMouseDownPosition();
+    auto clickBounds = playIcon.getLocalBounds();
+    if (state == Playing) 
+        clickBounds = pauseIcon.getLocalBounds(); 
+    DBG(clickBounds.getX() + "," + clickBounds.getY());
+    DBG("Your mom");
+
+    if (clickBounds.contains(location.getX(), location.getY()) && state == Stopped)
+    {
+        playIcon.setVisible(false);
+        pauseIcon.setVisible(true);
+        playButtonClicked();
+        DBG("hi");
+    }
+    if (clickBounds.contains(location.getX(), location.getY()) && state == Playing)
+    {
+        playIcon.setVisible(true);
+        pauseIcon.setVisible(false);
+        playButtonClicked();
+        DBG("bye");
+    }
+}
 
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(
-        getLookAndFeel().findColour(
-            juce::ResizableWindow::backgroundColourId
-        )
-    );
+    g.fillAll(juce::Colour(0xff171717));
+
+    //volume bar background
+    g.setColour(lighterPurple);
+    g.drawRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10, 5);
+    g.setColour(purple);
+    g.fillRoundedRectangle(getWidth() - 100, 20, 100, getHeight() - 160, 10);
+
+    //play button background
+    g.setColour(lighterPurple);
+    g.drawRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10, 5);
+    g.setColour(purple);
+    g.fillRoundedRectangle(0, getHeight() - 120, getWidth(), getHeight(), 10);
+    
+    
+    if (albumArt.isNull() == false) {
+        //album cover background
+        g.setColour(lighterPurple);
+        g.drawRoundedRectangle((getWidth() / 2) - 150, 70, 300, 300, 0, 10);
+        repaint();
+    }
+
+    g.setColour(juce::Colour(0xff000000));
+    g.drawRect(onlineStatusLabel.getX(), onlineStatusLabel.getY(), onlineStatusLabel.getWidth(), onlineStatusLabel.getHeight());
+
 }
 
 
@@ -641,16 +444,23 @@ void MainComponent::resized()
         30
     );
 
-    playButton.setBounds(
-        100,
-        10,
+    playIcon.setBounds(
+        (getWidth() / 2) - 40,
+        getHeight() - 100,
+        80, 
+        80
+    );
+
+    pauseIcon.setBounds(
+        (getWidth() / 2) - 40,
+        getHeight() - 100,
         80,
-        30
+        80
     );
 
     libraryBox.setBounds(
-        190,
         10,
+        50,
         300,
         30
     );
@@ -661,7 +471,7 @@ void MainComponent::resized()
     // =========================================================
 
     albumArtComponent.setBounds(
-        30,
+        (getWidth() / 2) - 150,
         70,
         300,
         300
@@ -673,9 +483,9 @@ void MainComponent::resized()
     // =========================================================
 
     lyricsButton.setBounds(
-        30,
-        380,
-        300,
+        albumArtComponent.getX() + albumArtComponent.getWidth() + 10,
+        70,
+        250,
         35
     );
 
@@ -685,13 +495,10 @@ void MainComponent::resized()
         lyricsEditor.setVisible(true);
 
         lyricsEditor.setBounds(
-            30,
-            420,
-            300,
-            juce::jmax(
-                100,
-                getHeight() - 440
-            )
+            lyricsButton.getX(),
+            lyricsButton.getY() + 40,
+            250,
+            260
         );
     }
     else
@@ -712,35 +519,34 @@ void MainComponent::resized()
     // =========================================================
 
     songTitleLabel.setBounds(
-        350,
-        75,
+        (getWidth() / 2) - (songTitleLabel.getWidth() / 2),
+        albumArtComponent.getY() + albumArtComponent.getHeight() + 10,
         500,
         40
     );
 
     artistLabel.setBounds(
-        350,
-        120,
+        (getWidth() / 2) - (artistLabel.getWidth() / 2),
+        albumArtComponent.getY() + albumArtComponent.getHeight() + 40,
         500,
         30
     );
 
     albumLabel.setBounds(
-        350,
-        155,
+        (getWidth() / 2) - (albumLabel.getWidth() / 2),
+        albumArtComponent.getY() + albumArtComponent.getHeight() + 60,
         500,
         30
     );
-
-
+    
     // =========================================================
     // ONLINE STATUS
     // =========================================================
 
     onlineStatusLabel.setBounds(
-        350,
-        getHeight() - 55,
-        500,
+        getWidth() - onlineStatusLabel.getWidth() - 10,
+        getHeight() - 25,
+        150,
         25
     );
 
@@ -749,19 +555,27 @@ void MainComponent::resized()
     // VOLUME
     // =========================================================
 
-    volumeLabel.setBounds(
-        getWidth() - 150,
-        getHeight() - 270,
-        100,
+    playButton.setBounds(
+        (getWidth() / 2) - 40,
+        getHeight() - 100,
+        80, 
         30
     );
 
-    volumeSlider.setBounds(
-        getWidth() - 140,
-        getHeight() - 235,
-        80,
+    volumeSlider.setBounds(getWidth() - 90,
+        getHeight() - 360, 
+        80, 
         190
     );
+
+    soundIcon.setBounds(
+        getWidth() - 65,
+        getHeight() - 395,
+        30,
+        30
+    );
+
+    
 }
 
 
@@ -913,7 +727,7 @@ bool MainComponent::loadTrack(
 
     if (reader == nullptr)
         return false;
-
+    
 
     // =========================================================
     // READ EMBEDDED SONG INFORMATION
