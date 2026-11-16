@@ -4,6 +4,7 @@ MainComponent::MainComponent()
     : state(Stopped),
     lyricsExpanded(false)
 {
+    //bapple sauce
     openButton.setButtonText("Open...");
     openButton.onClick = [this] { openButtonClicked(); };
     addAndMakeVisible(openButton);
