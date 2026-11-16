@@ -17,6 +17,93 @@ MainComponent::MainComponent()
     playButton.setEnabled(false);
     addAndMakeVisible(playButton);
 
+    // =========================================================
+// SONG PROGRESS BAR
+// =========================================================
+
+    progressSlider.setSliderStyle(
+        juce::Slider::LinearHorizontal
+    );
+
+    progressSlider.setTextBoxStyle(
+        juce::Slider::NoTextBox,
+        false,
+        0,
+        0
+    );
+
+    progressSlider.setRange(0.0, 1.0, 0.01);
+    progressSlider.setValue(0.0);
+
+    progressSlider.setColour(
+        juce::Slider::trackColourId,
+        juce::Colours::red
+    );
+
+    progressSlider.setColour(
+        juce::Slider::backgroundColourId,
+        juce::Colours::darkgrey
+    );
+
+    progressSlider.setColour(
+        juce::Slider::thumbColourId,
+        juce::Colours::white
+    );
+
+    progressSlider.setWantsKeyboardFocus(false);
+
+    progressSlider.onValueChange = [this]
+        {
+            if (transportSource.getLengthInSeconds() > 0.0)
+            {
+                transportSource.setPosition(
+                    progressSlider.getValue()
+                );
+            }
+        };
+
+    addAndMakeVisible(progressSlider);
+
+    progressSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+
+
+    // CURRENT TIME
+
+    currentTimeLabel.setText(
+        "00:00",
+        juce::dontSendNotification
+    );
+
+    currentTimeLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colours::white
+    );
+
+    currentTimeLabel.setJustificationType(
+        juce::Justification::centred
+    );
+
+    addAndMakeVisible(currentTimeLabel);
+
+
+    // TOTAL TIME
+
+    totalTimeLabel.setText(
+        "00:00",
+        juce::dontSendNotification
+    );
+
+    totalTimeLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colours::white
+    );
+
+    totalTimeLabel.setJustificationType(
+        juce::Justification::centred
+    );
+
+    addAndMakeVisible(totalTimeLabel);
+
     libraryBox.setTextWhenNothingSelected("Library (empty)");
     libraryBox.onChange = [this] { trackSelected(); };
     addAndMakeVisible(libraryBox);
@@ -228,7 +315,8 @@ MainComponent::MainComponent()
         juce::Justification::centred
     );
 
-    addAndMakeVisible(onlineStatusLabel);
+    // Online lookup remains active, but its status text is hidden.
+    // (No addAndMakeVisible call for onlineStatusLabel.)
 
 
     setSize(1100, 700);
@@ -323,11 +411,20 @@ MainComponent::MainComponent()
     );
 
     addAndMakeVisible(volumeLabel);
+
+    // Keyboard controls
+    setWantsKeyboardFocus(true);
+    grabKeyboardFocus();
+
+    // Update playback progress 10 times per second
+    startTimerHz(10);
 }
 
 
 MainComponent::~MainComponent()
 {
+
+    stopTimer();
     transportSource.stop();
     transportSource.setSource(nullptr);
     readerSource.reset();
@@ -401,8 +498,38 @@ void MainComponent::resized()
     playButton.setBounds(
         (getWidth() / 2) - 40,
         getHeight() - 100,
-        80, 
+        80,
         30
+    );
+
+    // =========================================================
+// CENTERED SONG PROGRESS BAR
+// =========================================================
+
+    int progressWidth = 500;
+
+    int progressX =
+        (getWidth() - progressWidth) / 2;
+
+    currentTimeLabel.setBounds(
+        progressX - 55,
+        getHeight() - 65,
+        50,
+        25
+    );
+
+    progressSlider.setBounds(
+        (getWidth() - 500) / 2,
+        getHeight() - 55,
+        500,
+        20
+    );
+
+    totalTimeLabel.setBounds(
+        progressX + progressWidth + 5,
+        getHeight() - 65,
+        50,
+        25
     );
 
     libraryBox.setBounds(
@@ -446,8 +573,8 @@ void MainComponent::resized()
             420,
             300,
             juce::jmax(
-                100,
-                getHeight() - 440
+                0,
+                juce::jmin(150, getHeight() - 550)
             )
         );
     }
@@ -494,12 +621,8 @@ void MainComponent::resized()
     // ONLINE STATUS
     // =========================================================
 
-    onlineStatusLabel.setBounds(
-        350,
-        getHeight() - 55,
-        500,
-        25
-    );
+    // Online status label intentionally has no visible bounds.
+
 
 
     // =========================================================
@@ -509,13 +632,13 @@ void MainComponent::resized()
     playButton.setBounds(
         (getWidth() / 2) - 40,
         getHeight() - 100,
-        80, 
+        80,
         30
     );
 
     volumeSlider.setBounds(getWidth() - 90,
-        getHeight() - 360, 
-        80, 
+        getHeight() - 360,
+        80,
         190
     );
 
@@ -757,6 +880,28 @@ bool MainComponent::loadTrack(
     // Reset playback state
     transportSource.setPosition(0.0);
     state = Stopped;
+
+    // Reset progress display for new track
+    progressSlider.setRange(
+        0.0,
+        transportSource.getLengthInSeconds(),
+        0.01
+    );
+
+    progressSlider.setValue(
+        0.0,
+        juce::dontSendNotification
+    );
+
+    currentTimeLabel.setText(
+        "00:00",
+        juce::dontSendNotification
+    );
+
+    totalTimeLabel.setText(
+        formatTime(transportSource.getLengthInSeconds()),
+        juce::dontSendNotification
+    );
 
 
     playButton.setButtonText("Play");
@@ -1528,4 +1673,132 @@ void MainComponent::playButtonClicked()
 
     else if (state == Playing)
         changeState(Stopping);
+}
+
+// =========================================================
+// FORMAT TIME: 00:00
+// =========================================================
+
+juce::String MainComponent::formatTime(double seconds)
+{
+    int totalSeconds = juce::jmax(
+        0,
+        juce::roundToInt(seconds)
+    );
+
+    int minutes = totalSeconds / 60;
+    int remainingSeconds = totalSeconds % 60;
+
+    return juce::String::formatted(
+        "%02d:%02d",
+        minutes,
+        remainingSeconds
+    );
+}
+
+
+// =========================================================
+// UPDATE PROGRESS BAR
+// =========================================================
+
+void MainComponent::timerCallback()
+{
+    double totalTime =
+        transportSource.getLengthInSeconds();
+
+    double currentTime =
+        transportSource.getCurrentPosition();
+
+    if (totalTime <= 0.0)
+    {
+        currentTimeLabel.setText(
+            "00:00",
+            juce::dontSendNotification
+        );
+
+        totalTimeLabel.setText(
+            "00:00",
+            juce::dontSendNotification
+        );
+
+        return;
+    }
+
+    // Update progress range
+    progressSlider.setRange(
+        0.0,
+        totalTime,
+        0.01
+    );
+
+    // Update slider without triggering seeking
+    progressSlider.setValue(
+        currentTime,
+        juce::dontSendNotification
+    );
+
+    // Update elapsed time
+    currentTimeLabel.setText(
+        formatTime(currentTime),
+        juce::dontSendNotification
+    );
+
+    // Update total duration
+    totalTimeLabel.setText(
+        formatTime(totalTime),
+        juce::dontSendNotification
+    );
+}
+
+
+// =========================================================
+// SEEK FORWARD / BACKWARD
+// =========================================================
+
+void MainComponent::seekBySeconds(double seconds)
+{
+    double totalTime =
+        transportSource.getLengthInSeconds();
+
+    if (totalTime <= 0.0)
+        return;
+
+    double newPosition =
+        transportSource.getCurrentPosition() + seconds;
+
+    newPosition = juce::jlimit(
+        0.0,
+        totalTime,
+        newPosition
+    );
+
+    transportSource.setPosition(newPosition);
+
+    progressSlider.setValue(
+        newPosition,
+        juce::dontSendNotification
+    );
+}
+
+
+// =========================================================
+// KEYBOARD CONTROLS
+// =========================================================
+
+bool MainComponent::keyPressed(
+    const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::leftKey)
+    {
+        seekBySeconds(-10.0);
+        return true;
+    }
+
+    if (key == juce::KeyPress::rightKey)
+    {
+        seekBySeconds(10.0);
+        return true;
+    }
+
+    return false;
 }
